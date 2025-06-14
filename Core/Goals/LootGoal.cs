@@ -21,6 +21,7 @@ public sealed partial class LootGoal : GoapGoal, IGoapEventListener
     public override float Cost => 4.6f;
 
     private const int MAX_TIME_TO_REACH_MELEE = 10000;
+    private const int MAX_ATTEMPTS = 3;
 
     private readonly ILogger<LootGoal> logger;
     private readonly ConfigurableInput input;
@@ -91,14 +92,23 @@ public sealed partial class LootGoal : GoapGoal, IGoapEventListener
 
         CheckInventoryFull();
 
-        if (TryLoot())
+        bool success = false;
+        int attempts = 0;
+        while (attempts < MAX_ATTEMPTS)
         {
+            success = TryLoot();
+            attempts++;
+            if (success)
+                break;
+
+            wait.Fixed(Loot.LOOTFRAME_AUTOLOOT_DELAY_MS);
+        }
+        LogLootAttempts(logger, attempts);
+
+        if (success)
             HandleSuccessfulLoot();
-        }
         else
-        {
             HandleFailedLoot();
-        }
 
         CleanUpAfterLooting();
 
@@ -522,6 +532,12 @@ public sealed partial class LootGoal : GoapGoal, IGoapEventListener
         Level = LogLevel.Error,
         Message = "Keyboard loot failed! Has target ? {hasTarget}")]
     static partial void LogKeyboardLootFailed(ILogger logger, bool hasTarget);
+
+    [LoggerMessage(
+        EventId = 0137,
+        Level = LogLevel.Information,
+        Message = "Loot attempts: {attempts}")]
+    static partial void LogLootAttempts(ILogger logger, int attempts);
 
     [LoggerMessage(
         EventId = 0147,
